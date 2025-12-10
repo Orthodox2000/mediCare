@@ -1,20 +1,23 @@
-import React from 'react';
-import type { Metadata } from 'next';
-import { ThemeProvider } from './components/ThemeProvider';
 import "./globals.css";
+import AppShell from "./components/AppShell";
 
+export const metadata = {
+  title: "MediCare",
+  description: "Smart healthcare dashboard",
+};
 
-export const metadata: Metadata = { title: 'MediCare' };
-
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-return (
-<html lang="en">
-<body>
-<ThemeProvider>
-{children}
-</ThemeProvider>
-</body>
-</html>
-);
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <AppShell>
+          {children}
+        </AppShell>
+      </body>
+    </html>
+  );
 }

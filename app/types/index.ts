@@ -1,27 +1,27 @@
 export interface Doctor {
-id: number;
-name: string;
-specialty: string;
-experience: string;
-rating: number;
-image: string;
+    id: number;
+    name: string;
+    specialty: string;
+    experience: string;
+    rating: number;
+    image: string;
 }
 
 
 export interface Appointment {
-id: number;
-date: string;
-time: string;
-doctor: string;
-type: string;
+    id: number;
+    date: string;
+    time: string;
+    doctor: string;
+    type: string;
 }
 
 
 export interface VitalSigns {
-id: number;
-vital: string;
-value: string;
-trend: string;
+    id: number;
+    vital: string;
+    value: string;
+    trend: string;
 }
 
 

@@ -47,8 +47,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const theme: Theme = {
     isDark,
     bg: isDark ? 'bg-gray-500' : 'bg-gray-50',
-    cardBg: isDark ? 'bg-gray-800' : 'bg-white',
-    text: isDark ? 'text-gray-100' : 'text-gray-100',
+    cardBg: isDark ? 'bg-gray-200' : 'bg-white',
+    text: isDark ? 'text-gray-100' : 'text-gray-800',
     textSecondary: isDark ? 'text-gray-100' : 'text-gray-900',
     accent: 'from-blue-600 to-cyan-500',
     accentHover: 'from-blue-700 to-cyan-600',

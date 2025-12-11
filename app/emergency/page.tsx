@@ -9,7 +9,7 @@ export default function EmergencyPage() {
 
 
     const emergencyContacts = [
-        { name: 'Emergency Ambulance', number: '911', icon: Phone, color: 'from-red-500 to-pink-500' },
+        { name: 'Emergency Ambulance', number: '112', icon: Phone, color: 'from-red-500 to-pink-500' },
         { name: 'Poison Control', number: '1-800-222-1222', icon: Phone, color: 'from-orange-500 to-red-500' },
         { name: 'Mental Health Crisis', number: '988', icon: MessageSquare, color: 'from-purple-500 to-pink-500' },
         { name: 'Nearest Hospital', number: '+1-555-0123', icon: MapPin, color: 'from-blue-500 to-cyan-500' }
@@ -34,7 +34,7 @@ export default function EmergencyPage() {
                 <div className={`${theme.cardBg} rounded-2xl p-8 shadow-xl ${theme.border} border mb-8`}><h2 className="text-2xl font-bold mb-6 flex items-center"><Heart className="w-6 h-6 mr-2 text-red-500" />First Aid Quick Reference</h2><div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">{firstAidTips.map((tip, i) => { const Icon = tip.icon; return (<div key={i} className={`p-6 rounded-xl ${theme.border} border-2 hover:border-red-500 transition-all duration-300 transform hover:scale-105 cursor-pointer`}><Icon className="w-8 h-8 text-red-500 mb-3" /><h3 className="font-bold text-lg mb-2">{tip.title}</h3><p className={`text-sm ${theme.textSecondary}`}>{tip.desc}</p></div>) })}</div></div>
 
 
-                <div className="bg-gradient-to-r from-red-500 to-pink-500 rounded-2xl p-8 text-white text-center shadow-2xl"><Bell className="w-16 h-16 mx-auto mb-4 animate-bounce" /><h2 className="text-3xl font-bold mb-4">In Case of Emergency</h2><p className="text-lg mb-6 opacity-90">If you're experiencing a life-threatening emergency, call 911 immediately</p><a href="tel:911" className="inline-block px-12 py-4 bg-white text-red-600 rounded-xl hover:bg-gray-100 transform hover:scale-105 transition-all duration-300 shadow-lg font-bold text-lg">Call 911 Now</a></div>
+                <div className="bg-gradient-to-r from-red-500 to-pink-500 rounded-2xl p-8 text-white text-center shadow-2xl"><Bell className="w-16 h-16 mx-auto mb-4 animate-bounce" /><h2 className="text-3xl font-bold mb-4">In Case of Emergency</h2><p className="text-lg mb-6 opacity-90">If you're experiencing a life-threatening emergency, call 112 immediately</p><a href="tel:911" className="inline-block px-12 py-4 bg-white text-red-600 rounded-xl hover:bg-gray-100 transform hover:scale-105 transition-all duration-300 shadow-lg font-bold text-lg">Call 112 Now</a></div>
             </div>
         </div>
     );

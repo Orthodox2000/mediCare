@@ -1,6 +1,13 @@
 import "./globals.css";
 import AppShell from "./components/AppShell";
-
+import {
+  ClerkProvider,
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from '@clerk/nextjs'
 export const metadata = {
   title: "MediCare",
   description: "Smart healthcare dashboard",
@@ -11,13 +18,16 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
+  return ( 
     <html lang="en">
       <body>
-        <AppShell>
-          {children}
-        </AppShell>
+        
+          <AppShell>
+            {children}
+          </AppShell>
+        
       </body>
-    </html>
+    </html> 
+    
   );
 }

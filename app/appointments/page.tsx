@@ -12,16 +12,19 @@ export default function AppointmentsPage() {
 
 
     const appointments = [
-        { id: 1, doctor: 'Dr. Sarah Johnson', specialty: 'Cardiologist', date: '2024-12-15', time: '10:00 AM', status: 'Confirmed' },
-        { id: 2, doctor: 'Dr. Michael Chen', specialty: 'Neurologist', date: '2024-12-18', time: '2:30 PM', status: 'Pending' }
+        { id: 1, doctor: 'Dr. Supriya Khandekar', specialty: 'Cardiologist', date: '2024-12-15', time: '10:00 AM', status: 'Confirmed' },
+        { id: 2, doctor: 'Dr. Poonam Shinde', specialty: 'Ophthalmologist', date: '2024-12-18', time: '2:30 PM', status: 'Pending' }
     ];
 
 
     const timeSlots = ['9:00 AM', '10:00 AM', '11:00 AM', '2:00 PM', '3:00 PM', '4:00 PM'];
     const doctors = [
-        { name: 'Dr. Sarah Johnson', specialty: 'Cardiologist' },
-        { name: 'Dr. Michael Chen', specialty: 'Neurologist' },
-        { name: 'Dr. Emily Davis', specialty: 'Pediatrician' }
+        { name: 'Dr. Supriya Khandekar', specialty: 'Cardiologist' },
+        { name: 'Dr. Piyush Raut', specialty: 'Neurologist' },
+        { name: 'Dr. Prashant Shinde', specialty: 'Dentist' },
+        { name: 'Dr. Ankit Mali ', specialty: 'Pediatrician' },
+        { name: 'Dr. Poonam Shinde ', specialty: 'Ophthalmologists' },
+        { name: 'Dr. Atharva More  ', specialty: 'Dermatalogist' }
     ];
 
 

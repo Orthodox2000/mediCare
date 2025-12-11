@@ -1,5 +1,5 @@
 "use client";
-
+import { ClerkProvider, SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -95,48 +95,57 @@ const Navbar: React.FC<NavbarProps> = ({
                                 <Moon className="w-5 h-5 text-black" />
                             )}
                         </button>
+                        <ClerkProvider>
+                        <div className="  md:block px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg hover:from-blue-700 hover:to-cyan-600 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl">
+                            <SignedOut>
+                            <SignInButton />
+                        </SignedOut>
 
-                        <button className="hidden md:block px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg hover:from-blue-700 hover:to-cyan-600 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl">
-                            Sign In
-                        </button>
-
-                        <button
-                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                            className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
-                        >
-                            {mobileMenuOpen ? <X /> : <Menu />}
-                        </button>
+                        <SignedIn>
+                            <UserButton />
+                        </SignedIn>
                     </div>
+                    </ClerkProvider>
+
+                    <button
+                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                        className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                        {mobileMenuOpen ? <X /> : <Menu />}
+                    </button>
                 </div>
             </div>
+        </div>
 
-            {/* Mobile Menu */}
-            {mobileMenuOpen && (
-                <div
-                    className={`md:hidden ${theme.cardBg} border-t ${theme.border} animate-fadeIn`}
-                >
-                    <div className="px-4 py-3 space-y-2">
-                        {navItems.map((item) => {
-                            const isActive = pathname === item.href;
+            {/* Mobile Menu */ }
+    {
+        mobileMenuOpen && (
+            <div
+                className={`md:hidden ${theme.cardBg} border-t ${theme.border} animate-fadeIn`}
+            >
+                <div className="px-4 py-3 space-y-2">
+                    {navItems.map((item) => {
+                        const isActive = pathname === item.href;
 
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    onClick={() => setMobileMenuOpen(false)}
-                                    className={`block w-full px-4 py-3 rounded-lg transition-all duration-300 ${isActive
-                                        ? `bg-gradient-to-r ${theme.accent} text-white`
-                                        : `${theme.textSecondary} hover:${theme.text} hover:bg-opacity-10 hover:bg-gray-500`
-                                        }`}
-                                >
-                                    {item.label}
-                                </Link>
-                            );
-                        })}
-                    </div>
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                onClick={() => setMobileMenuOpen(false)}
+                                className={`block w-full px-4 py-3 rounded-lg transition-all duration-300 ${isActive
+                                    ? `bg-gradient-to-r ${theme.accent} text-white`
+                                    : `${theme.textSecondary} hover:${theme.text} hover:bg-opacity-10 hover:bg-gray-500`
+                                    }`}
+                            >
+                                {item.label}
+                            </Link>
+                        );
+                    })}
                 </div>
-            )}
-        </nav>
+            </div>
+        )
+    }
+        </nav >
     );
 };
 

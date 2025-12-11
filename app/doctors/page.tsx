@@ -9,12 +9,13 @@ export default function DoctorsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSpecialty, setSelectedSpecialty] = useState('All');
     const doctors = [
-        { name: 'Dr. Sarah Johnson', specialty: 'Cardiologist', rating: 4.9, patients: 2500, image: '👩‍⚕️', experience: '15 years' },
-        { name: 'Dr. Michael Chen', specialty: 'Neurologist', rating: 4.8, patients: 2100, image: '👨‍⚕️', experience: '12 years' },
-        { name: 'Dr. Emily Davis', specialty: 'Pediatrician', rating: 4.9, patients: 3200, image: '👩‍⚕️', experience: '10 years' },
-        { name: 'Dr. James Wilson', specialty: 'Orthopedic', rating: 4.7, patients: 1800, image: '👨‍⚕️', experience: '18 years' },
-        { name: 'Dr. Lisa Anderson', specialty: 'Dermatologist', rating: 4.8, patients: 2400, image: '👩‍⚕️', experience: '14 years' },
-        { name: 'Dr. Robert Lee', specialty: 'Psychiatrist', rating: 4.9, patients: 1900, image: '👨‍⚕️', experience: '16 years' }
+        { name: 'Dr. Supriya Khandekar ', specialty: 'Cardiologist', rating: 4.9, patients: 3500, image: <img src={"./spk.png" } className='rounded-full h-full w-full'></img>, experience: '15 years' },
+        { name: 'Dr. Piyush Raut', specialty: 'Neurologist', rating: 4.8, patients: 2100, image: '👨‍⚕️', experience: '12 years' },
+        { name: 'Dr. Poonam Shinde', specialty: 'Pediatrician', rating: 4.9, patients: 3200, image: '👩', experience: '10 years' },
+        { name: 'Dr. Prashant Shinde', specialty: 'Orthopedic', rating: 4.7, patients: 1800, image: '👨‍⚕️', experience: '18 years' },
+        { name: 'Dr. Diksha ', specialty: 'Dermatologist', rating: 4.8, patients: 2400, image: '👩‍⚕️', experience: '14 years' },
+        { name: 'Dr. Ankit Mali', specialty: 'Psychiatrist', rating: 4.9, patients: 1900, image: '👨‍⚕️', experience: '16 years' },
+        { name: 'Dr. Atharva More MBBS', specialty: 'Psychiatrist', rating: 4.9, patients: 100, image: '👨‍⚕️', experience: '3 years' }
     ];
     const specialties = ['All', 'Cardiologist', 'Neurologist', 'Pediatrician', 'Orthopedic', 'Dermatologist', 'Psychiatrist'];
 

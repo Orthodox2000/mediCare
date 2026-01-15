@@ -44,16 +44,16 @@ const Footer: React.FC<FooterProps> = ({ setCurrentPage }) => {
                     <div>
                         <h3 className="font-bold mb-4">Contact</h3>
                         <div className="space-y-3">
-                            <div className={`flex items-center space-x-2 ${theme.textSecondary}`}><Phone className="w-4 h-4" /><span>+1-555-MEDICARE</span></div>
+                            <div className={`flex items-center space-x-2 ${theme.textSecondary}`}><Phone className="w-4 h-4" /><span>+91-000-MEDICARE</span></div>
                             <div className={`flex items-center space-x-2 ${theme.textSecondary}`}><Mail className="w-4 h-4" /><span>support@medicare.com</span></div>
-                            <div className={`flex items-center space-x-2 ${theme.textSecondary}`}><MapPin className="w-4 h-4" /><span>123 Health St, Medical City</span></div>
+                            <div className={`flex items-center space-x-2 ${theme.textSecondary}`}><MapPin className="w-4 h-4" /><span>1, Some random Place</span></div>
                         </div>
                     </div>
                 </div>
 
 
                 <div className={`pt-8 border-t ${theme.border} text-center ${theme.textSecondary}`}>
-                    <p>© 2024 MediCare. All rights reserved. Built with care for your health.</p>
+                    <p>2025 MediCare. Built with care for your health.</p>
                 </div>
             </div>
         </footer>

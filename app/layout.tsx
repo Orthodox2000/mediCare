@@ -1,15 +1,8 @@
 import "./globals.css";
 import AppShell from "./components/AppShell";
-import {
-  ClerkProvider,
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from '@clerk/nextjs'
+import { AuthProvider } from "./lib/AuthContext";
 export const metadata = {
-  title: "MediCare",
+  title: "Pixel Cup MediCare",
   description: "Smart healthcare dashboard",
 };
 
@@ -18,16 +11,16 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return ( 
+  return (
     <html lang="en">
       <body>
-        
-          <AppShell>
-            {children}
-          </AppShell>
-        
+
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
+
       </body>
-    </html> 
-    
+    </html>
+
   );
 }

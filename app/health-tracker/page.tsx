@@ -1,59 +1,157 @@
-"use client"
-import React, { useState } from 'react';
-import { Heart, Activity, TrendingUp, Zap } from 'lucide-react';
-import { ThemeContext } from '../components/ThemeProvider';
+"use client";
 
+import React, { useState } from "react";
+import {
+  Heart,
+  Activity,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  CartesianGrid,
+  ResponsiveContainer,
+} from "recharts";
 
-export default function HealthTrackerPage() {
-    const theme = React.useContext(ThemeContext)!;
-    const [activeMetric, setActiveMetric] = useState('heartRate');
-
-
-    const healthMetrics = [
-        { id: 'heartRate', label: 'Heart Rate', value: '72', unit: 'bpm', icon: Heart, color: 'from-red-500 to-pink-500', status: 'Normal' },
-        { id: 'bloodPressure', label: 'Blood Pressure', value: '120/80', unit: 'mmHg', icon: Activity, color: 'from-blue-500 to-cyan-500', status: 'Good' },
-        { id: 'weight', label: 'Weight', value: '68', unit: 'kg', icon: TrendingUp, color: 'from-green-500 to-emerald-500', status: 'Stable' },
-        { id: 'steps', label: 'Steps Today', value: '8,542', unit: 'steps', icon: Zap, color: 'from-purple-500 to-pink-500', status: 'Active' }
-    ];
-    return (
-        <div className={`min-h-screen py-24 px-4 ${theme.bg} ${theme.text}`}>
-            <div className="max-w-7xl mx-auto">
-                <h1 className="text-4xl font-bold mb-8 bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">Health Tracker</h1>
-
-
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">{healthMetrics.map((metric) => {
-                    const Icon = metric.icon; return (<div key={metric.id} onClick={() => setActiveMetric(metric.id)} className={`${theme.cardBg} rounded-2xl p-6 shadow-xl ${theme.border} border transform hover:scale-105 transition-all duration-300 cursor-pointer group ${activeMetric === metric.id ? 'ring-4 ring-blue-500 ring-opacity-50' : ''}`}>
-                        <div className="flex items-start justify-between mb-4"><div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${metric.color} flex items-center justify-center transform group-hover:rotate-6 transition-transform duration-300`}><Icon className="w-6 h-6 text-white" /></div><span className={`px-3 py-1 rounded-full text-xs font-semibold ${metric.status === 'Normal' || metric.status === 'Good' || metric.status === 'Stable' || metric.status === 'Active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>{metric.status}</span></div><h3 className={`text-sm ${theme.textSecondary} mb-2`}>{metric.label}</h3><div className="flex items-baseline space-x-2"><span className="text-3xl font-bold">{metric.value}</span><span className={`text-sm ${theme.textSecondary}`}>{metric.unit}</span></div></div>)
-                })}</div>
-
-
-                <div className={`${theme.cardBg} rounded-2xl p-8 shadow-xl ${theme.border} border mb-8`}>
-                    <h2 className="text-2xl font-bold mb-6">Weekly Trends</h2>
-                    <div className="h-64 flex items-end justify-between space-x-2">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => { const height = Math.random() * 60 + 40; return (<div key={day} className="flex-1 flex flex-col items-center"><div className="w-full bg-gradient-to-t from-blue-600 to-cyan-500 rounded-t-lg hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 cursor-pointer transform hover:scale-105" style={{ height: `${height}%` }}></div><span className={`text-xs mt-2 ${theme.textSecondary}`}>{day}</span></div>) })}</div>
-                </div>
-
-
-                <div className={`${theme.cardBg} rounded-2xl p-8 shadow-xl ${theme.border} border`}>
-                    <h2 className="text-2xl font-bold mb-6">Log Health Data</h2>
-                    <div className="grid md:grid-cols-2 gap-6">
-                        <div>
-                            <label className={`block mb-2 font-semibold ${theme.textSecondary}`}>Metric Type</label>
-                            <select className={`w-full px-4 py-3 rounded-xl ${theme.cardBg} ${theme.border} border-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none`}>
-                                <option>Heart Rate</option>
-                                <option>Blood Pressure</option>
-                                <option>Weight</option>
-                                <option>Blood Sugar</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className={`block mb-2 font-semibold ${theme.textSecondary}`}>Value</label>
-                            <input type="text" placeholder="Enter value..." className={`w-full px-4 py-3 rounded-xl ${theme.cardBg} ${theme.border} border-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none`} />
-                        </div>
-                        <div className="md:col-span-2"><button className="w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-xl hover:from-blue-700 hover:to-cyan-600 transform hover:scale-105 transition-all duration-300 shadow-lg font-semibold">Save Entry</button></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+interface Metric {
+  id: string;
+  label: string;
+  value: string;
+  unit: string;
+  icon: React.ElementType;
+  color: string;
+  status: string;
 }
 
+const healthMetrics: Metric[] = [
+  {
+    id: "heartRate",
+    label: "Heart Rate",
+    value: "72",
+    unit: "bpm",
+    icon: Heart,
+    color: "#ef4444",
+    status: "Normal",
+  },
+  {
+    id: "bloodPressure",
+    label: "Blood Pressure",
+    value: "120/80",
+    unit: "mmHg",
+    icon: Activity,
+    color: "#3b82f6",
+    status: "Good",
+  },
+  {
+    id: "weight",
+    label: "Weight",
+    value: "68",
+    unit: "kg",
+    icon: TrendingUp,
+    color: "#22c55e",
+    status: "Stable",
+  },
+  {
+    id: "sugar",
+    label: "Blood Sugar",
+    value: "98",
+    unit: "mg/dL",
+    icon: Zap,
+    color: "#a855f7",
+    status: "Controlled",
+  },
+];
+
+// Example weekly data
+const trendData = [
+  { day: "Mon", heartRate: 70, bloodPressure: 118, weight: 68.2, sugar: 95 },
+  { day: "Tue", heartRate: 72, bloodPressure: 120, weight: 68.1, sugar: 98 },
+  { day: "Wed", heartRate: 75, bloodPressure: 122, weight: 68.0, sugar: 100 },
+  { day: "Thu", heartRate: 71, bloodPressure: 119, weight: 68.1, sugar: 96 },
+  { day: "Fri", heartRate: 73, bloodPressure: 121, weight: 68.2, sugar: 97 },
+  { day: "Sat", heartRate: 76, bloodPressure: 124, weight: 68.3, sugar: 102 },
+  { day: "Sun", heartRate: 72, bloodPressure: 120, weight: 68.2, sugar: 98 },
+];
+
+export default function HealthTrendPage() {
+  const [selectedMetric, setSelectedMetric] = useState<string>("heartRate");
+
+  return (
+    <div className="min-h-screen text-black p-10 bg-gray-100 flex flex-col space-y-10">
+      {/* Header */}
+      <h1 className="text-4xl font-bold text-black">Health Trends Dashboard</h1>
+
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {healthMetrics.map((metric) => {
+          const Icon = metric.icon;
+          return (
+            <div
+              key={metric.id}
+              onClick={() => setSelectedMetric(metric.id)}
+              className={`rounded-2xl p-6 shadow-md border border-gray-200 flex items-center space-x-4 cursor-pointer transition-transform transform hover:scale-105 ${
+                selectedMetric === metric.id ? "ring-4 ring-blue-500 ring-opacity-50" : ""
+              } bg-white`}
+            >
+              <div
+                className="p-3 rounded-xl text-black"
+                style={{ background: metric.color }}
+              >
+                <Icon size={28} />
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-800">{metric.label}</p>
+                <h3 className="text-xl font-bold text-gray-800">
+                  {metric.value}{" "}
+                  <span className="text-gray-800 text-sm ">{metric.unit}</span>
+                </h3>
+                <p className="text-xs text-green-600">{metric.status}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Trend Line Chart */}
+      <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-200">
+        <h2 className="text-2xl font-bold mb-6 text-black">Weekly Trend: {healthMetrics.find(m => m.id === selectedMetric)?.label}</h2>
+
+        <ResponsiveContainer width="100%" height={400}>
+          <LineChart
+            data={trendData}
+            margin={{ top: 20, right: 30, left: 10, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" opacity={0.4} />
+            <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+            <YAxis tick={{ fontSize: 12 }} />
+            <Tooltip />
+            <Legend />
+
+            <Line
+              type="monotone"
+              dataKey={selectedMetric as keyof typeof trendData[0]}
+              stroke={
+                selectedMetric === "heartRate"
+                  ? "#ef4444"
+                  : selectedMetric === "bloodPressure"
+                  ? "#3b82f6"
+                  : selectedMetric === "weight"
+                  ? "#22c55e"
+                  : "#a855f7"
+              }
+              strokeWidth={3}
+              dot={{ r: 4 }}
+              activeDot={{ r: 6 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}

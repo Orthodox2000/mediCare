@@ -32,6 +32,11 @@ const navItems = [
   { href: "/emergency", label: "Emergency" },
 ];
 
+// Routes that REQUIRE login
+const protectedRoutes = [
+  "/health-tracker",
+];
+
 const Navbar: React.FC<NavbarProps> = ({
   isDark,
   setIsDark,
@@ -47,6 +52,18 @@ const Navbar: React.FC<NavbarProps> = ({
 
   const displayName =
     user?.displayName || user?.email?.split("@")[0] || "User";
+
+  const handleProtectedNav = (
+    e: React.MouseEvent,
+    href: string
+  ) => {
+    if (!user && protectedRoutes.includes(href)) {
+      e.preventDefault();
+      setAuthOpen(true);
+      return;
+    }
+    setMobileMenuOpen(false);
+  };
 
   return (
     <>
@@ -79,7 +96,12 @@ const Navbar: React.FC<NavbarProps> = ({
               {navItems.map((item) => (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={
+                    user || !protectedRoutes.includes(item.href)
+                      ? item.href
+                      : "#"
+                  }
+                  onClick={(e) => handleProtectedNav(e, item.href)}
                   className={`px-4 py-2 rounded-lg transition
                     ${
                       pathname === item.href
@@ -87,7 +109,13 @@ const Navbar: React.FC<NavbarProps> = ({
                         : isDark
                         ? "text-white hover:bg-gray-800"
                         : "text-black hover:bg-gray-200"
-                    }`}
+                    }
+                    ${
+                      !user && protectedRoutes.includes(item.href)
+                        ? "opacity-90"
+                        : ""
+                    }
+                  `}
                 >
                   {item.label}
                 </Link>
@@ -100,7 +128,7 @@ const Navbar: React.FC<NavbarProps> = ({
               {/* Theme Toggle */}
               <button
                 onClick={() => setIsDark(!isDark)}
-                className="p-2 rounded-lg border hover:scale-110 transition"
+                className="p-2 rounded-lg border hover:scale-110 transition text-gray-500"
               >
                 {isDark ? <Sun /> : <Moon />}
               </button>
@@ -119,7 +147,6 @@ const Navbar: React.FC<NavbarProps> = ({
                     </button>
                   ) : (
                     <div className="relative">
-                      {/* Avatar */}
                       <button
                         onClick={() => setProfileOpen(!profileOpen)}
                         className="w-10 h-10 rounded-full bg-gradient-to-r
@@ -128,7 +155,6 @@ const Navbar: React.FC<NavbarProps> = ({
                         {displayName[0].toUpperCase()}
                       </button>
 
-                      {/* Dropdown */}
                       {profileOpen && (
                         <div
                           className="absolute right-0 mt-2 w-56 bg-white
@@ -177,8 +203,12 @@ const Navbar: React.FC<NavbarProps> = ({
               {navItems.map((item) => (
                 <Link
                   key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
+                  href={
+                    user || !protectedRoutes.includes(item.href)
+                      ? item.href
+                      : "#"
+                  }
+                  onClick={(e) => handleProtectedNav(e, item.href)}
                   className="block px-4 py-3 rounded-lg hover:bg-gray-200"
                 >
                   {item.label}
@@ -189,7 +219,7 @@ const Navbar: React.FC<NavbarProps> = ({
         )}
       </nav>
 
-      {/* AUTH MODAL (OUTSIDE NAV) */}
+      {/* AUTH MODAL */}
       <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
     </>
   );

@@ -208,8 +208,7 @@ export default function AppointmentsPage() {
                         <AnimatePresence>
                             {appointments.map((apt) => (
                                 <motion.div
-                                    key={apt.id}
-                                    variants={cardVariants}
+                                    key={apt.id} 
                                     initial="hidden"
                                     animate="visible"
                                     exit="exit"

@@ -1,5 +1,5 @@
 "use client";
-
+import { jsPDF } from "jspdf";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -84,7 +84,7 @@ const trendData = [
 export default function HealthTrendPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-
+  const [details,setdetails] = useState<string[]>([]);
   const [selectedMetric, setSelectedMetric] = useState("heartRate");
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -133,15 +133,14 @@ export default function HealthTrendPage() {
           weight: d.weight,
           sugar: d.sugar,
         }));
+        setdetails(dbPoints);
 
-        const merged = [ ...dbPoints,...trendData].slice(0,7);
-        console.log(merged);
+        const merged = [ ...dbPoints,...trendData].slice(0,7); 
         setChartData(merged);
       } catch (err) {
         console.error("Fetch error:", err);
       }
-    };
-
+    }; 
     fetchHealthData();
   }, [user]);
 
@@ -196,8 +195,26 @@ export default function HealthTrendPage() {
     }
   };
 
+  //metric table printing
+  const handlePrintPDF = async () => {
+  const doc = new jsPDF();
+
+  // Dynamically import the autotable plugin
+  const { default: autoTable } = await import("jspdf-autotable");
+  
+  autoTable(doc, {
+    html: "#metrics-table",
+    theme: "grid",
+    styles: { fontSize: 8 },
+    startY: 10,
+  });
+  doc.save("metrics.pdf");
+};
+
   return (
     <div className="min-h-screen bg-gray-100 p-10 space-y-8">
+      
+  
       <h1 className="text-4xl font-bold text-black">
         Health Trends Dashboard
       </h1>
@@ -228,6 +245,7 @@ export default function HealthTrendPage() {
           {error}
         </div>
       )}
+     
 
       {/* METRIC CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -290,6 +308,39 @@ export default function HealthTrendPage() {
     />
   </LineChart>
 </ResponsiveContainer>
+
+{/* Table to show all metrics */}
+<div className="overflow-x-auto mt-8">
+   <button
+        onClick={() =>  handlePrintPDF()}
+        className="flex items-center px-6 py-3 rounded-xl
+        bg-gradient-to-r from-blue-600 to-cyan-500 text-white
+        hover:scale-105 transition shadow mb-2 w-[150px]"
+      >Print Table</button>
+  <table className="w-full min-w-max  text-gray-600 border border-gray-500"    id="metrics-table">
+    <thead>
+      <tr>
+        {/* Dynamic headers based on keys in your data */}
+        {Object.keys(details[0] || {}).map((key) => (
+          <th key={key} className="border px-4 py-2 text-left capitalize">
+            {key}
+          </th>
+        ))}
+      </tr>
+    </thead>
+    <tbody>
+      {details.map((item, index) => (
+        <tr key={index} className="hover:bg-gray-100">
+          {Object.values(item).map((value, i) => (
+            <td key={i} className="border px-4 py-2">
+              {value}
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
 
       </div>
 

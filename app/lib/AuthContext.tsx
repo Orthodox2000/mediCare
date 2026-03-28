@@ -27,7 +27,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         saveUserToCache({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
-          name: firebaseUser.displayName!,
+          name:
+            firebaseUser.displayName ||
+            firebaseUser.email?.split("@")[0] ||
+            "User",
+          phone: firebaseUser.phoneNumber || undefined,
         });
       } else {
         setUser(null);

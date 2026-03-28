@@ -19,6 +19,8 @@ import { logoutUser } from "@/app/lib/firebaseAuth";
 interface NavbarProps {
   isDark: boolean;
   setIsDark: (v: boolean) => void;
+  currentPage: string;
+  setCurrentPage: (v: string) => void;
   mobileMenuOpen: boolean;
   setMobileMenuOpen: (v: boolean) => void;
   scrollY: number;
@@ -40,8 +42,11 @@ const protectedRoutes = [
 const Navbar: React.FC<NavbarProps> = ({
   isDark,
   setIsDark,
+  currentPage,
+  setCurrentPage,
   mobileMenuOpen,
   setMobileMenuOpen,
+  scrollY,
 }) => {
   const theme = React.useContext(ThemeContext) as Theme;
   const pathname = usePathname();

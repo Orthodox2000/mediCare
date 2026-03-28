@@ -44,8 +44,8 @@ const healthMetrics: Metric[] = [
   },
   {
     id: "bloodPressure",
-    label: "Blood Pressure",
-    value: "120/80",
+    label: "Blood Pressure (Systolic)",
+    value: "120",
     unit: "mmHg",
     icon: Activity,
     color: "#3b82f6",
@@ -71,30 +71,113 @@ const healthMetrics: Metric[] = [
   },
 ];
 
-const trendData = [
-  { day: "Mon", heartRate: 70, bloodPressure: 118, weight: 68.2, sugar: 95 },
-  { day: "Tue", heartRate: 72, bloodPressure: 120, weight: 68.1, sugar: 98 },
-  { day: "Wed", heartRate: 75, bloodPressure: 122, weight: 68.0, sugar: 100 },
-  { day: "Thu", heartRate: 71, bloodPressure: 119, weight: 68.1, sugar: 96 },
-  { day: "Fri", heartRate: 73, bloodPressure: 121, weight: 68.2, sugar: 97 },
-  { day: "Sat", heartRate: 76, bloodPressure: 124, weight: 68.3, sugar: 102 },
-  { day: "Sun", heartRate: 72, bloodPressure: 120, weight: 68.2, sugar: 98 },
-];
+type HealthPoint = {
+  day: string; // ISO YYYY-MM-DD
+  heartRate: number | null;
+  bloodPressure: number | null; // systolic
+  weight: number | null;
+  sugar: number | null;
+};
+
+type ChartPoint = HealthPoint & {
+  isFiller: boolean;
+};
+
+const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+const toIsoDate = (d: Date) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+const lastNDatesIso = (n: number) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dates: string[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    dates.push(toIsoDate(d));
+  }
+  return dates;
+};
+
+const lastNDatesIsoEndingAt = (endIso: string, n: number) => {
+  const end = new Date(`${endIso}T00:00:00`);
+  if (Number.isNaN(end.getTime())) return lastNDatesIso(n);
+  end.setHours(0, 0, 0, 0);
+  const dates: string[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(end);
+    d.setDate(end.getDate() - i);
+    dates.push(toIsoDate(d));
+  }
+  return dates;
+};
+
+const formatShortDate = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00`);
+  return d.toLocaleDateString(undefined, { month: "short", day: "2-digit" });
+};
+
+const dummyForIndex = (i: number): Omit<HealthPoint, "day"> => {
+  const base = [
+    { heartRate: 70, bloodPressure: 118, weight: 68.2, sugar: 95 },
+    { heartRate: 72, bloodPressure: 120, weight: 68.1, sugar: 98 },
+    { heartRate: 75, bloodPressure: 122, weight: 68.0, sugar: 100 },
+    { heartRate: 71, bloodPressure: 119, weight: 68.1, sugar: 96 },
+    { heartRate: 73, bloodPressure: 121, weight: 68.2, sugar: 97 },
+    { heartRate: 76, bloodPressure: 124, weight: 68.3, sugar: 102 },
+    { heartRate: 72, bloodPressure: 120, weight: 68.2, sugar: 98 },
+  ];
+  return base[i % base.length];
+};
+
+const alignSeries = (dates: string[], dbPoints: HealthPoint[]): ChartPoint[] => {
+  const byDay = new Map<string, HealthPoint>();
+  for (const p of dbPoints) byDay.set(p.day, p);
+
+  return dates.map((day, idx) => {
+    const existing = byDay.get(day);
+    if (existing) {
+      return {
+        day,
+        heartRate: existing.heartRate ?? null,
+        bloodPressure: existing.bloodPressure ?? null,
+        weight: existing.weight ?? null,
+        sugar: existing.sugar ?? null,
+        isFiller: false,
+      } satisfies ChartPoint;
+    }
+
+    const dummy = dummyForIndex(idx);
+    return {
+      day,
+      heartRate: dummy.heartRate,
+      bloodPressure: dummy.bloodPressure,
+      weight: dummy.weight,
+      sugar: dummy.sugar,
+      isFiller: true,
+    } satisfies ChartPoint;
+  });
+};
 
 export default function HealthTrendPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [details,setdetails] = useState<string[]>([]);
+  // Table should show only real DB points (no dummy filler)
+  const [details, setDetails] = useState<HealthPoint[]>([]);
   const [selectedMetric, setSelectedMetric] = useState("heartRate");
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fetching, setFetching] = useState(false);
 
   // ✅ CHART DATA STATE (STATIC + DB)
-  const [chartData, setChartData] = useState(trendData);
+  const [chartData, setChartData] = useState<ChartPoint[]>(() =>
+    alignSeries(lastNDatesIso(7), [])
+  );
 
   const [form, setForm] = useState({
+    date: toIsoDate(new Date()),
     heartRate: "",
     bloodPressure: "",
     weight: "",
@@ -106,7 +189,7 @@ export default function HealthTrendPage() {
   ======================= */
   useEffect(() => {
     if (!loading && !user) {
-      router.replace("/health-tracer");
+      router.replace("/");
     }
   }, [user, loading, router]);
 
@@ -119,6 +202,7 @@ export default function HealthTrendPage() {
     const fetchHealthData = async () => {
       try {
          if (!user?.email) return;
+        setFetching(true);
         const res = await fetch(
           `/api/health/add?userId=${encodeURIComponent(user.email)}`
         );
@@ -126,19 +210,37 @@ export default function HealthTrendPage() {
 
         if (!data.success || !Array.isArray(data.data)) return;
 
-        const dbPoints = data.data.map((d: any) => ({
-          day: d.day, // normalized in API
-          heartRate: d.heartRate,
-          bloodPressure: d.bloodPressure,
-          weight: d.weight,
-          sugar: d.sugar,
-        }));
-        setdetails(dbPoints);
+        const dbPointsRaw: HealthPoint[] = data.data
+          .map((d: any) => ({
+            day: String(d.day || ""),
+            heartRate: typeof d.heartRate === "number" ? d.heartRate : null,
+            bloodPressure:
+              typeof d.bloodPressure === "number" ? d.bloodPressure : null,
+            weight: typeof d.weight === "number" ? d.weight : null,
+            sugar: typeof d.sugar === "number" ? d.sugar : null,
+          }))
+          .filter((p: HealthPoint) => /^\d{4}-\d{2}-\d{2}$/.test(p.day));
 
-        const merged = [ ...dbPoints,...trendData].slice(0,7); 
-        setChartData(merged);
+        // If multiple records exist for the same day, keep the latest one
+        const byDay = new Map<string, HealthPoint>();
+        for (const p of dbPointsRaw) byDay.set(p.day, p);
+        const dbPoints = Array.from(byDay.values()).sort((a, b) =>
+          a.day.localeCompare(b.day)
+        );
+
+        setDetails(dbPoints);
+        if (!dbPoints.length) {
+          // No real data -> remove fake filler entirely
+          setChartData([]);
+        } else {
+          const end = dbPoints[dbPoints.length - 1].day;
+          const dates = lastNDatesIsoEndingAt(end, 7);
+          setChartData(alignSeries(dates, dbPoints));
+        }
       } catch (err) {
         console.error("Fetch error:", err);
+      } finally {
+        setFetching(false);
       }
     }; 
     fetchHealthData();
@@ -163,13 +265,40 @@ export default function HealthTrendPage() {
     setError(null);
 
     try {
+      const safeDate = form.date;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(safeDate)) {
+        throw new Error("Invalid date");
+      }
+
+      const toNumOrNull = (v: string) => {
+        const t = v.trim();
+        if (!t) return null;
+        const n = Number(t);
+        if (!Number.isFinite(n)) return null;
+        return n;
+      };
+
+      const heartRate = toNumOrNull(form.heartRate);
+      const bloodPressure = toNumOrNull(form.bloodPressure);
+      const weight = toNumOrNull(form.weight);
+      const sugar = toNumOrNull(form.sugar);
+
+      if (
+        heartRate == null &&
+        bloodPressure == null &&
+        weight == null &&
+        sugar == null
+      ) {
+        throw new Error("Enter at least one metric");
+      }
+
       const payload = {
         userId: user.email,
-        date: new Date().toISOString().split("T")[0],
-        heartRate: Number(form.heartRate),
-        bloodPressure: Number(form.bloodPressure),
-        weight: Number(form.weight),
-        sugar: Number(form.sugar),
+        date: safeDate,
+        heartRate,
+        bloodPressure,
+        weight,
+        sugar,
       };
 
       const res = await fetch("/api/health/add", {
@@ -183,11 +312,55 @@ export default function HealthTrendPage() {
 
       setMessage("Health data saved successfully ✅");
       setShowModal(false);
-      setForm({ heartRate: "", bloodPressure: "", weight: "", sugar: "" });
-    } catch {
-      setError("Failed to save health data");
+      setForm({
+        date: toIsoDate(new Date()),
+        heartRate: "",
+        bloodPressure: "",
+        weight: "",
+        sugar: "",
+      });
+
+      setFetching(true);
+      const refreshed = await fetch(
+        `/api/health/add?userId=${encodeURIComponent(user.email)}`
+      );
+      const refreshedJson = await refreshed.json().catch(() => ({}));
+      if (
+        refreshed.ok &&
+        refreshedJson?.success &&
+        Array.isArray(refreshedJson?.data)
+      ) {
+        const dbPointsRaw: HealthPoint[] = refreshedJson.data
+          .map((d: any) => ({
+            day: String(d.day || ""),
+            heartRate: typeof d.heartRate === "number" ? d.heartRate : null,
+            bloodPressure:
+              typeof d.bloodPressure === "number" ? d.bloodPressure : null,
+            weight: typeof d.weight === "number" ? d.weight : null,
+            sugar: typeof d.sugar === "number" ? d.sugar : null,
+          }))
+          .filter((p: HealthPoint) => /^\d{4}-\d{2}-\d{2}$/.test(p.day));
+
+        const byDay = new Map<string, HealthPoint>();
+        for (const p of dbPointsRaw) byDay.set(p.day, p);
+        const dbPoints = Array.from(byDay.values()).sort((a, b) =>
+          a.day.localeCompare(b.day)
+        );
+
+        setDetails(dbPoints);
+        if (!dbPoints.length) {
+          setChartData([]);
+        } else {
+          const end = dbPoints[dbPoints.length - 1].day;
+          const dates = lastNDatesIsoEndingAt(end, 7);
+          setChartData(alignSeries(dates, dbPoints));
+        }
+      }
+    } catch (e: any) {
+      setError(e?.message || "Failed to save health data");
     } finally {
       setSaving(false);
+      setFetching(false);
       setTimeout(() => {
         setMessage(null);
         setError(null);
@@ -218,7 +391,7 @@ export default function HealthTrendPage() {
       <h1 className="text-4xl font-bold text-black">
         Health Trends Dashboard
       </h1>
-    <div className="flex flex-row gap-5">
+    <div className="flex flex-row gap-5 flex-wrap">
       <button
         onClick={() => setShowModal(true)}
         className="flex items-center gap-2 px-6 py-3 rounded-xl
@@ -229,11 +402,46 @@ export default function HealthTrendPage() {
         Add Health Data
       </button>
       <button
-        onClick={() => window.location.reload()}
+        onClick={() => {
+          if (!user?.email) return;
+          setFetching(true);
+          fetch(`/api/health/add?userId=${encodeURIComponent(user.email)}`)
+            .then((r) => r.json())
+            .then((data) => {
+              if (!data?.success || !Array.isArray(data?.data)) return;
+              const dbPointsRaw: HealthPoint[] = data.data
+                .map((d: any) => ({
+                  day: String(d.day || ""),
+                  heartRate: typeof d.heartRate === "number" ? d.heartRate : null,
+                  bloodPressure:
+                    typeof d.bloodPressure === "number" ? d.bloodPressure : null,
+                  weight: typeof d.weight === "number" ? d.weight : null,
+                  sugar: typeof d.sugar === "number" ? d.sugar : null,
+                }))
+                .filter((p: HealthPoint) => /^\d{4}-\d{2}-\d{2}$/.test(p.day));
+              const byDay = new Map<string, HealthPoint>();
+              for (const p of dbPointsRaw) byDay.set(p.day, p);
+              const dbPoints = Array.from(byDay.values()).sort((a, b) =>
+                a.day.localeCompare(b.day)
+              );
+
+              const aligned = alignSeries(lastNDatesIso(7), dbPoints);
+              setDetails(dbPoints);
+              setChartData(aligned);
+            })
+            .finally(() => setFetching(false));
+        }}
         className="flex items-center gap-2 px-6 py-3 rounded-xl
         bg-gradient-to-r from-blue-600 to-cyan-500 text-white
         hover:scale-105 transition shadow"
       >Refresh</button></div>
+
+      {fetching && (
+        <div className="flex items-center gap-3 text-sm text-gray-600">
+          <div className="w-4 h-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+          Loading latest data...
+        </div>
+      )}
 
       {message && (
         <div className="bg-green-100 text-green-700 px-4 py-3 rounded-xl">
@@ -289,25 +497,30 @@ export default function HealthTrendPage() {
         </h2>
 
         <ResponsiveContainer width="100%" height={400}>
-  <LineChart data={chartData}>
-    <CartesianGrid strokeDasharray="3 3" opacity={0.4} />
-    <XAxis dataKey="day" />
-    <YAxis />
-    <Tooltip
-      formatter={(value: number) => value}
-      labelFormatter={(label: string) => label}
-    />
-    <Legend />
-    <Line
-      type="monotone"
-      dataKey={selectedMetric}
-      stroke="#2563eb"
-      strokeWidth={3}
-      dot={{ r: 4 }}
-      activeDot={{ r: 6 }}
-    />
-  </LineChart>
-</ResponsiveContainer>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.4} />
+            <XAxis
+              dataKey="day"
+              tickFormatter={(v: string) => formatShortDate(v)}
+              minTickGap={12}
+            />
+            <YAxis />
+            <Tooltip
+              formatter={(value: any) => (value == null ? "—" : value)}
+              labelFormatter={(label: string) => formatShortDate(label)}
+            />
+            <Legend />
+            <Line
+              type="monotone"
+              dataKey={selectedMetric}
+              stroke="#2563eb"
+              strokeWidth={3}
+              dot={{ r: 3 }}
+              activeDot={{ r: 5 }}
+              connectNulls
+            />
+          </LineChart>
+        </ResponsiveContainer>
 
 {/* Table to show all metrics */}
 <div className="overflow-x-auto mt-8">
@@ -317,6 +530,9 @@ export default function HealthTrendPage() {
         bg-gradient-to-r from-blue-600 to-cyan-500 text-white
         hover:scale-105 transition shadow mb-2 w-[150px]"
       >Print Table</button>
+  {details.length === 0 ? (
+    <p className="text-sm text-gray-600">No saved health entries yet.</p>
+  ) : (
   <table className="w-full min-w-max  text-gray-600 border border-gray-500"    id="metrics-table">
     <thead>
       <tr>
@@ -333,13 +549,14 @@ export default function HealthTrendPage() {
         <tr key={index} className="hover:bg-gray-100">
           {Object.values(item).map((value, i) => (
             <td key={i} className="border px-4 py-2">
-              {value}
+              {value == null ? "—" : String(value)}
             </td>
           ))}
         </tr>
       ))}
     </tbody>
   </table>
+  )}
 </div>
 
       </div>
@@ -355,9 +572,17 @@ export default function HealthTrendPage() {
               </button>
             </div>
 
+            <input
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+              max={toIsoDate(new Date())}
+              className="w-full border p-3 rounded-lg text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
             {[
               { key: "heartRate", label: "Heart Rate (bpm)" },
-              { key: "bloodPressure", label: "Blood Pressure" },
+              { key: "bloodPressure", label: "Blood Pressure (Systolic mmHg)" },
               { key: "weight", label: "Weight (kg)" },
               { key: "sugar", label: "Blood Sugar (mg/dL)" },
             ].map((f) => (
@@ -370,6 +595,7 @@ export default function HealthTrendPage() {
                   setForm({ ...form, [f.key]: e.target.value })
                 }
                 className="w-full border p-3 rounded-lg text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min={0}
               />
             ))}
 

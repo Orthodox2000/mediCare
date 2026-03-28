@@ -3,12 +3,15 @@ import React, { useEffect, useState } from 'react';
 import Footer from './components/footer';
 import { ThemeContext } from './components/ThemeProvider';
 import HospitalCarousel from './components/Carousel';
-import { Calendar, Users, Activity, Shield, ChevronRight } from 'lucide-react';
+import { Calendar, Users, Activity, Shield, ChevronRight, Bell } from 'lucide-react';
 import StatsSection from './components/stats';
 import Link from 'next/link';
+import { useAuth } from './lib/AuthContext';
 export default function HomePage() {
     const theme = React.useContext(ThemeContext)!;
     const [currentPage, setCurrentPage] = useState('home'); 
+    const { user, loading: authLoading } = useAuth();
+    const [notifications, setNotifications] = useState<any[]>([]);
 
     const [scrollY, setScrollY] = useState(0);
 
@@ -18,6 +21,24 @@ export default function HomePage() {
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+
+    useEffect(() => {
+        if (!user) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch(`/api/notifications?uid=${encodeURIComponent(user.uid)}`);
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok) return;
+                if (!cancelled) setNotifications((json.data || []).slice(0, 6));
+            } catch {
+                // ignore
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [user?.uid]);
     const features = [
         { icon: Calendar, title: 'Easy Booking', desc: 'Schedule appointments instantly', color: 'from-blue-500 to-cyan-400', link: 'appointments' },
         { icon: Users, title: 'Expert Doctors', desc: 'Access to certified professionals', color: 'from-purple-500 to-pink-400', link: '/doctors' },
@@ -85,6 +106,37 @@ export default function HomePage() {
 
 
             <StatsSection />
+
+            {!authLoading && user && (
+                <section className="py-10 px-4">
+                    <div className="max-w-7xl mx-auto">
+                        <div className={`${theme.cardBg} rounded-3xl p-8 shadow-2xl border ${theme.border}`}>
+                            <div className="flex items-center justify-between gap-4 mb-4">
+                                <div className="flex items-center gap-2">
+                                    <Bell className="w-5 h-5 text-blue-500" />
+                                    <h2 className="text-xl font-bold">Your Notifications</h2>
+                                </div>
+                                <Link href="/appointments" className="text-sm text-blue-600 font-medium">
+                                    View appointments
+                                </Link>
+                            </div>
+
+                            {notifications.length === 0 ? (
+                                <p className={theme.textSecondary}>No notifications yet.</p>
+                            ) : (
+                                <div className="grid md:grid-cols-2 gap-3">
+                                    {notifications.map((n: any) => (
+                                        <div key={n._id} className={`p-4 rounded-2xl border ${theme.border}`}>
+                                            <p className="font-semibold">{n.title}</p>
+                                            <p className={`${theme.textSecondary} text-sm mt-1`}>{n.message}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </section>
+            )}
             <HospitalCarousel />
 
             <section className="py-20 px-4">

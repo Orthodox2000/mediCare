@@ -9,6 +9,7 @@ import {
   ConfirmationResult,
   User,
   updateProfile,
+  linkWithPhoneNumber,
 } from "firebase/auth";
 import { auth } from "./firebase";
 
@@ -67,7 +68,24 @@ export const googleLogin = async (): Promise<{
 
 /** Create Recaptcha */
 export const createRecaptcha = (containerId: string): RecaptchaVerifier => {
-  return new RecaptchaVerifier(auth, containerId, { size: "invisible" });
+  if (typeof window !== "undefined" && window.recaptchaVerifier) {
+    try {
+      window.recaptchaVerifier.clear();
+    } catch {
+      // ignore
+    }
+    window.recaptchaVerifier = undefined;
+  }
+
+  const verifier = new RecaptchaVerifier(auth, containerId, {
+    size: "invisible",
+  });
+
+  if (typeof window !== "undefined") {
+    window.recaptchaVerifier = verifier;
+  }
+
+  return verifier;
 };
 
 /** Send OTP */
@@ -78,21 +96,22 @@ export const sendOtp = async (
   return await signInWithPhoneNumber(auth, phoneNumber, recaptcha);
 };
 
-/** Verify OTP */
-export const verifyOtp = async (
+/** Send OTP to LINK a phone to an existing signed-in user */
+export const sendOtpToLinkPhone = async (
+  user: User,
+  phoneNumber: string,
+  recaptcha: RecaptchaVerifier
+): Promise<ConfirmationResult> => {
+  return await linkWithPhoneNumber(user, phoneNumber, recaptcha);
+};
+
+/** Confirm OTP (sign-in OR link) */
+export const confirmOtp = async (
   confirmationResult: ConfirmationResult,
   otp: string
-): Promise<{
-  uid: string;
-  phone: string;
-  provider: "phone";
-}> => {
+): Promise<User> => {
   const res = await confirmationResult.confirm(otp);
-  return {
-    uid: res.user.uid,
-    phone: res.user.phoneNumber ?? "",
-    provider: "phone",
-  };
+  return res.user;
 };
 
 /* ───────────────────────── LOGOUT ───────────────────────── */

@@ -28,6 +28,15 @@ export async function POST(req: NextRequest) {
   let doc = await settings.findOne({ _id: "singleton" });
   if (!doc) {
     const defaults = getDefaultAdminCredentials();
+    if (!defaults.password) {
+      return NextResponse.json(
+        {
+          error:
+            "Admin bootstrap password is not configured. Set ADMIN_DEFAULT_PASSWORD in .env.",
+        },
+        { status: 500 }
+      );
+    }
     const hashed = hashPassword(defaults.password);
     doc = {
       _id: "singleton",
@@ -50,4 +59,3 @@ export async function POST(req: NextRequest) {
     expiresInSeconds: 3600,
   });
 }
-

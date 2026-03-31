@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Navbar from "./navbar";
 import { ThemeProvider } from "./ThemeProvider";
 import PhoneRequiredModal from "./PhoneRequiredModal";
+import RouteProgress from "./RouteProgress";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [isDark, setIsDark] = useState(false);
@@ -19,6 +20,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeProvider>
+      <React.Suspense fallback={null}>
+        <RouteProgress />
+      </React.Suspense>
       <Navbar
         isDark={isDark}
         setIsDark={setIsDark}

@@ -8,6 +8,8 @@ type Tab = "doctors" | "patients" | "appointments" | "messages" | "settings";
 type DoctorDoc = {
   _id: string;
   name: string;
+  fields?: string[];
+  hospitals?: string[];
   specialty: string;
   experience?: string | null;
   rating?: number | null;
@@ -33,11 +35,30 @@ type AppointmentDoc = {
   patientName?: string | null;
   doctor: string;
   specialty: string;
+  venue?: string | null;
   date: string;
   time: string;
   status: string;
+  paymentStatus?: string | null;
+  paymentFailureReason?: string | null;
   reason?: string | null;
 };
+
+const hospitalOptionsFallback = [
+  "SWACS Hospital",
+  "MetroCare Hospital",
+  "City General Hospital",
+  "Lifeline Multispecialty Hospital",
+  "Sunrise Medical Center",
+];
+
+const parseCsvList = (value: string) =>
+  value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const normalizeDoctorName = (value: string) => value.trim().toLowerCase();
 
 const DEFAULT_ADMIN_USERNAME = "admin";
 const DEFAULT_ADMIN_PASSWORD = "Admin@123";
@@ -76,6 +97,7 @@ export default function AdminPage() {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error || "Login failed");
       localStorage.setItem(tokenKey, json.token);
+      window.dispatchEvent(new Event("admin-auth-changed"));
       setToken(json.token);
     } catch (e: any) {
       setAuthError(e?.message || "Login failed");
@@ -86,6 +108,7 @@ export default function AdminPage() {
 
   const logout = () => {
     localStorage.removeItem(tokenKey);
+    window.dispatchEvent(new Event("admin-auth-changed"));
     setToken(null);
   };
 
@@ -191,11 +214,14 @@ export default function AdminPage() {
 
 function DoctorsAdmin({ authHeader, theme }: { authHeader: Record<string, string>; theme: any }) {
   const [list, setList] = useState<DoctorDoc[]>([]);
+  const [hospitalOptions, setHospitalOptions] = useState<string[]>(hospitalOptionsFallback);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const [name, setName] = useState("");
-  const [specialty, setSpecialty] = useState("");
+  const [fieldsInput, setFieldsInput] = useState("");
+  const [selectedHospitals, setSelectedHospitals] = useState<string[]>(["SWACS Hospital"]);
   const [experience, setExperience] = useState("");
 
   const load = async () => {
@@ -204,6 +230,11 @@ function DoctorsAdmin({ authHeader, theme }: { authHeader: Record<string, string
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(json?.error || "Failed to load doctors");
     setList(json.data || []);
+    const serverHospitals = Array.isArray(json?.meta?.hospitals) ? json.meta.hospitals : [];
+    const normalized = (serverHospitals.length ? serverHospitals : hospitalOptionsFallback).map(
+      (h: any) => String(h || "").trim()
+    ).filter(Boolean);
+    setHospitalOptions(Array.from(new Set(normalized)));
   };
 
   useEffect(() => {
@@ -214,16 +245,24 @@ function DoctorsAdmin({ authHeader, theme }: { authHeader: Record<string, string
   const addDoctor = async () => {
     setBusy(true);
     setError(null);
+    setSuccess(null);
     try {
       const res = await fetch("/api/doctors", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },
-        body: JSON.stringify({ name, specialty, experience }),
+        body: JSON.stringify({
+          name,
+          fields: parseCsvList(fieldsInput),
+          specialty: parseCsvList(fieldsInput)[0] || "",
+          hospitals: selectedHospitals,
+          experience,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error || "Failed to add doctor");
       setName("");
-      setSpecialty("");
+      setFieldsInput("");
+      setSelectedHospitals(["SWACS Hospital"]);
       setExperience("");
       await load();
     } catch (e: any) {
@@ -236,6 +275,7 @@ function DoctorsAdmin({ authHeader, theme }: { authHeader: Record<string, string
   const removeDoctor = async (id: string) => {
     setBusy(true);
     setError(null);
+    setSuccess(null);
     try {
       const res = await fetch(`/api/doctors?id=${encodeURIComponent(id)}`, {
         method: "DELETE",
@@ -251,10 +291,35 @@ function DoctorsAdmin({ authHeader, theme }: { authHeader: Record<string, string
     }
   };
 
+  const bootstrapDoctors = async () => {
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch("/api/doctors/bootstrap", {
+        method: "POST",
+        headers: authHeader,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Failed to bootstrap doctors");
+      setSuccess(
+        `Bootstrapped doctors. Inserted: ${json?.data?.inserted ?? 0}, updated: ${
+          json?.data?.updated ?? 0
+        }, total: ${json?.data?.total ?? 0}.`
+      );
+      await load();
+    } catch (e: any) {
+      setError(e?.message || "Failed to bootstrap doctors");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className={`${theme.cardBg} rounded-2xl p-8 shadow-xl ${theme.border} border`}>
       <h2 className="text-2xl font-bold mb-4">Doctors</h2>
       {error && <p className="text-red-600 mb-4 text-sm">{error}</p>}
+      {success && <p className="text-green-700 mb-4 text-sm">{success}</p>}
 
       <div className="grid md:grid-cols-3 gap-3 mb-6">
         <input
@@ -264,9 +329,9 @@ function DoctorsAdmin({ authHeader, theme }: { authHeader: Record<string, string
           className="px-4 py-3 rounded-xl border"
         />
         <input
-          value={specialty}
-          onChange={(e) => setSpecialty(e.target.value)}
-          placeholder="Specialty"
+          value={fieldsInput}
+          onChange={(e) => setFieldsInput(e.target.value)}
+          placeholder="Fields (comma separated)"
           className="px-4 py-3 rounded-xl border"
         />
         <input
@@ -276,13 +341,43 @@ function DoctorsAdmin({ authHeader, theme }: { authHeader: Record<string, string
           className="px-4 py-3 rounded-xl border"
         />
       </div>
-      <button
-        disabled={busy}
-        onClick={addDoctor}
-        className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold hover:scale-[1.02] transition shadow"
-      >
-        {busy ? "Saving..." : "Add Doctor"}
-      </button>
+      <div className="mb-6">
+        <label className="block text-sm font-semibold mb-2">Hospitals</label>
+        <select
+          multiple
+          value={selectedHospitals}
+          onChange={(e) => {
+            const values = Array.from(e.target.selectedOptions).map((o) => o.value);
+            setSelectedHospitals(values.length ? values : ["SWACS Hospital"]);
+          }}
+          className="w-full px-4 py-3 rounded-xl border min-h-[120px]"
+        >
+          {hospitalOptions.map((hospital) => (
+            <option key={hospital} value={hospital}>
+              {hospital}
+            </option>
+          ))}
+        </select>
+        <p className={`${theme.textSecondary} text-xs mt-2`}>
+          Hold Ctrl/Cmd to select multiple hospitals. Include SWACS Hospital where relevant.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <button
+          disabled={busy}
+          onClick={addDoctor}
+          className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold hover:scale-[1.02] transition shadow"
+        >
+          {busy ? "Saving..." : "Add Doctor"}
+        </button>
+        <button
+          disabled={busy}
+          onClick={bootstrapDoctors}
+          className="px-6 py-3 rounded-xl border hover:bg-gray-100 transition"
+        >
+          {busy ? "Please wait..." : "Bootstrap Sample Doctors"}
+        </button>
+      </div>
 
       <div className="mt-8 space-y-3">
         {list.map((d) => (
@@ -291,6 +386,7 @@ function DoctorsAdmin({ authHeader, theme }: { authHeader: Record<string, string
             doctor={d}
             authHeader={authHeader}
             theme={theme}
+            hospitalOptions={hospitalOptions}
             busy={busy}
             onRemove={removeDoctor}
             onUpdated={load}
@@ -306,6 +402,7 @@ function DoctorRow({
   doctor,
   authHeader,
   theme,
+  hospitalOptions,
   busy,
   onRemove,
   onUpdated,
@@ -313,13 +410,25 @@ function DoctorRow({
   doctor: DoctorDoc;
   authHeader: Record<string, string>;
   theme: any;
+  hospitalOptions: string[];
   busy: boolean;
   onRemove: (id: string) => Promise<void>;
   onUpdated: () => Promise<void>;
 }) {
   const [edit, setEdit] = useState(false);
   const [name, setName] = useState(doctor.name || "");
-  const [specialty, setSpecialty] = useState(doctor.specialty || "");
+  const [fieldsInput, setFieldsInput] = useState(
+    (Array.isArray(doctor.fields) && doctor.fields.length
+      ? doctor.fields
+      : [doctor.specialty || ""])
+      .filter(Boolean)
+      .join(", ")
+  );
+  const [selectedHospitals, setSelectedHospitals] = useState<string[]>(
+    Array.isArray(doctor.hospitals) && doctor.hospitals.length
+      ? doctor.hospitals
+      : ["SWACS Hospital"]
+  );
   const [experience, setExperience] = useState(doctor.experience || "");
   const [imageUrl, setImageUrl] = useState(doctor.imageUrl || "");
   const [localBusy, setLocalBusy] = useState(false);
@@ -335,7 +444,9 @@ function DoctorRow({
         body: JSON.stringify({
           id: doctor._id,
           name,
-          specialty,
+          fields: parseCsvList(fieldsInput),
+          specialty: parseCsvList(fieldsInput)[0] || "",
+          hospitals: selectedHospitals,
           experience,
           imageUrl,
         }),
@@ -356,7 +467,12 @@ function DoctorRow({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-semibold">{doctor.name}</p>
-          <p className={`${theme.textSecondary} text-sm`}>{doctor.specialty}</p>
+          <p className={`${theme.textSecondary} text-sm`}>
+            {(doctor.fields && doctor.fields.length ? doctor.fields : [doctor.specialty]).filter(Boolean).join(", ")}
+          </p>
+          <p className={`${theme.textSecondary} text-sm`}>
+            Venue options: {(doctor.hospitals || []).join(", ") || "SWACS Hospital"}
+          </p>
           {doctor.experience ? (
             <p className={`${theme.textSecondary} text-sm`}>{doctor.experience}</p>
           ) : null}
@@ -382,9 +498,29 @@ function DoctorRow({
         <div className="mt-4 grid md:grid-cols-2 gap-3">
           {error && <p className="text-red-600 text-sm md:col-span-2">{error}</p>}
           <input value={name} onChange={(e) => setName(e.target.value)} className="px-4 py-3 rounded-xl border" placeholder="Name" />
-          <input value={specialty} onChange={(e) => setSpecialty(e.target.value)} className="px-4 py-3 rounded-xl border" placeholder="Specialty" />
+          <input
+            value={fieldsInput}
+            onChange={(e) => setFieldsInput(e.target.value)}
+            className="px-4 py-3 rounded-xl border"
+            placeholder="Fields (comma separated)"
+          />
           <input value={experience} onChange={(e) => setExperience(e.target.value)} className="px-4 py-3 rounded-xl border" placeholder="Experience" />
           <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="px-4 py-3 rounded-xl border" placeholder="Image URL (optional)" />
+          <select
+            multiple
+            value={selectedHospitals}
+            onChange={(e) => {
+              const values = Array.from(e.target.selectedOptions).map((o) => o.value);
+              setSelectedHospitals(values.length ? values : ["SWACS Hospital"]);
+            }}
+            className="px-4 py-3 rounded-xl border md:col-span-2 min-h-[120px]"
+          >
+            {hospitalOptions.map((hospital) => (
+              <option key={hospital} value={hospital}>
+                {hospital}
+              </option>
+            ))}
+          </select>
           <button
             disabled={busy || localBusy}
             onClick={save}
@@ -551,7 +687,8 @@ function AppointmentsAdmin({ authHeader, theme }: { authHeader: Record<string, s
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [status, setStatus] = useState("");
-  const [doctors, setDoctors] = useState<{ name: string }[]>([]);
+  const [doctors, setDoctors] = useState<{ name: string; hospitals: string[] }[]>([]);
+  const [venueById, setVenueById] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -568,7 +705,15 @@ function AppointmentsAdmin({ authHeader, theme }: { authHeader: Record<string, s
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(json?.error || "Failed to load appointments");
-    setList(json.data || []);
+    const nextList = (json.data || []) as AppointmentDoc[];
+    setList(nextList);
+    setVenueById((prev) => {
+      const next = { ...prev };
+      for (const item of nextList) {
+        if (!next[item._id] && item.venue) next[item._id] = item.venue;
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -577,7 +722,16 @@ function AppointmentsAdmin({ authHeader, theme }: { authHeader: Record<string, s
       try {
         const res = await fetch("/api/doctors");
         const json = await res.json().catch(() => ({}));
-        if (res.ok) setDoctors((json.data || []).map((d: any) => ({ name: String(d.name || "") })));
+        if (res.ok) {
+          setDoctors(
+            (json.data || []).map((d: any) => ({
+              name: String(d.name || ""),
+              hospitals: Array.isArray(d.hospitals)
+                ? d.hospitals.map((h: any) => String(h || "")).filter(Boolean)
+                : ["SWACS Hospital"],
+            }))
+          );
+        }
       } catch {
         // ignore
       }
@@ -585,14 +739,17 @@ function AppointmentsAdmin({ authHeader, theme }: { authHeader: Record<string, s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const updateStatus = async (id: string, next: string) => {
+  const updateAppointment = async (
+    id: string,
+    payload: { status?: string; venue?: string }
+  ) => {
     setBusy(true);
     setError(null);
     try {
       const res = await fetch("/api/admin/appointments", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeader },
-        body: JSON.stringify({ id, status: next }),
+        body: JSON.stringify({ id, ...payload }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error || "Failed to update appointment");
@@ -602,6 +759,13 @@ function AppointmentsAdmin({ authHeader, theme }: { authHeader: Record<string, s
     } finally {
       setBusy(false);
     }
+  };
+
+  const getHospitalsForDoctor = (doctorName: string) => {
+    const needle = normalizeDoctorName(doctorName);
+    const found = doctors.find((d) => normalizeDoctorName(d.name) === needle);
+    const source = found?.hospitals?.length ? found.hospitals : hospitalOptionsFallback;
+    return Array.from(new Set(source));
   };
 
   return (
@@ -645,40 +809,99 @@ function AppointmentsAdmin({ authHeader, theme }: { authHeader: Record<string, s
       </button>
 
       <div className="mt-8 space-y-3">
-        {list.map((a) => (
+        {list.map((a, index) => (
+          (() => {
+            const isPaymentCancelled = a.paymentStatus === "cancelled";
+            return (
           <div key={a._id} className={`p-4 rounded-xl border ${theme.border}`}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-semibold">{a.doctor} • {a.date} • {a.time}</p>
+                <p className={`${theme.textSecondary} text-xs mb-1`}>
+                  Queue #{index + 1}
+                </p>
+                <p className="font-semibold">{a.doctor} | {a.date} | {a.time}</p>
                 <p className={`${theme.textSecondary} text-sm`}>{a.specialty}</p>
                 <p className={`${theme.textSecondary} text-sm mt-1`}>
-                  Patient: {a.patientEmail || a.patientName || "—"}
+                  Venue: {venueById[a._id] || a.venue || "TBD"}
+                </p>
+                <p className={`${theme.textSecondary} text-sm mt-1`}>
+                  Patient: {a.patientEmail || a.patientName || "--"}
                 </p>
                 {!a.patientEmail && (
                   <p className={`${theme.textSecondary} text-xs mt-1`}>uid: {a.uid}</p>
                 )}
                 {a.reason ? <p className={`${theme.textSecondary} text-sm mt-2`}>{a.reason}</p> : null}
+                {a.paymentStatus ? (
+                  <p className={`${theme.textSecondary} text-xs mt-1`}>
+                    Payment: {a.paymentStatus}
+                    {a.paymentFailureReason ? ` (${a.paymentFailureReason})` : ""}
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-col gap-2 items-end">
                 <span className="text-xs px-3 py-1 rounded-full bg-gray-100 border">{a.status}</span>
-                <div className="flex gap-2">
-                  <button disabled={busy} onClick={() => updateStatus(a._id, "approved")} className="px-4 py-2 rounded-xl border hover:bg-green-50 transition">
-                    Approve
-                  </button>
-                  <button disabled={busy} onClick={() => updateStatus(a._id, "rejected")} className="px-4 py-2 rounded-xl border hover:bg-red-50 transition">
-                    Reject
-                  </button>
-                </div>
+                {isPaymentCancelled ? (
+                  <p className="text-sm text-red-600 font-semibold">Payment cancelled</p>
+                ) : (
+                  <>
+                    <select
+                      value={venueById[a._id] || a.venue || "SWACS Hospital"}
+                      onChange={(e) =>
+                        setVenueById((prev) => ({ ...prev, [a._id]: e.target.value }))
+                      }
+                      className="px-3 py-2 rounded-xl border text-sm min-w-[220px]"
+                    >
+                      {getHospitalsForDoctor(a.doctor).map((hospital) => (
+                        <option key={`${a._id}-${hospital}`} value={hospital}>
+                          {hospital}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          updateAppointment(a._id, {
+                            status: "approved",
+                            venue: venueById[a._id] || a.venue || "SWACS Hospital",
+                          })
+                        }
+                        className="px-4 py-2 rounded-xl border hover:bg-green-50 transition"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() => updateAppointment(a._id, { status: "rejected" })}
+                        className="px-4 py-2 rounded-xl border hover:bg-red-50 transition"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          updateAppointment(a._id, {
+                            venue: venueById[a._id] || a.venue || "SWACS Hospital",
+                          })
+                        }
+                        className="px-4 py-2 rounded-xl border hover:bg-blue-50 transition"
+                      >
+                        Save Venue
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
+            );
+          })()
         ))}
         {list.length === 0 && <p className={`${theme.textSecondary}`}>No appointments found.</p>}
       </div>
     </div>
   );
 }
-
 function MessagesAdmin({ authHeader, theme }: { authHeader: Record<string, string>; theme: any }) {
   const [patients, setPatients] = useState<PatientDoc[]>([]);
   const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
@@ -833,3 +1056,4 @@ function SettingsAdmin({ authHeader, theme }: { authHeader: Record<string, strin
     </div>
   );
 }
+

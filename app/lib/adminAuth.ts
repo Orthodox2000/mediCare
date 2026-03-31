@@ -3,9 +3,12 @@ import type { NextRequest } from "next/server";
 
 const DEFAULT_ADMIN_USERNAME = "admin";
 const DEFAULT_ADMIN_PASSWORD = "Admin@123";
-
-const TOKEN_SECRET =
-  process.env.ADMIN_TOKEN_SECRET || process.env.MONGODB_URI || "dev-secret";
+const EXPLICIT_TOKEN_SECRET = (process.env.ADMIN_TOKEN_SECRET || "").trim();
+const FALLBACK_TOKEN_SECRET = crypto
+  .createHash("sha256")
+  .update(`${process.cwd()}|medical-app|admin-token`)
+  .digest("hex");
+const TOKEN_SECRET = EXPLICIT_TOKEN_SECRET || FALLBACK_TOKEN_SECRET;
 
 export const getDefaultAdminCredentials = () => ({
   username: DEFAULT_ADMIN_USERNAME,
@@ -92,4 +95,3 @@ export const getAdminAuth = (req: NextRequest) => {
   if (!match) return null;
   return verifyAdminToken(match[1]);
 };
-

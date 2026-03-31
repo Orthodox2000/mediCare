@@ -1,7 +1,7 @@
-# MediCare API Reference (Android + Web)
+# MediCare API Reference (Web + Android)
 
 Base URL:
--  https://medi-care-roan.vercel.app/
+- `https://medi-care-roan.vercel.app/`
 
 All JSON requests should send:
 - `Content-Type: application/json`
@@ -10,6 +10,9 @@ All JSON requests should send:
 
 ### AppointmentStatus
 `sent` | `pending_approval` | `approved` | `rejected` | `cancelled`
+
+### PaymentStatus
+`not_required` | `initiated` | `paid` | `failed` | `cancelled`
 
 ### Notification
 Stored in `notifications`:
@@ -28,68 +31,20 @@ Stored in `notifications`:
 
 ## Auth Model
 
-- User auth is handled by **Firebase Auth** in the client.
+- User auth is handled by Firebase Auth in the client.
 - Admin auth uses a server-issued token from `/api/admin/login`.
   - Provide `Authorization: Bearer <token>` to admin endpoints.
 
 ## Users
 
-### Check if an email exists
-`GET /api/users?email=<email>`
+### Check if email exists
+`GET /api/users?exists=1&email=<email>`
 
-Response:
-```json
-{ "exists": true }
-```
-
-Notes:
-- Prefer `GET /api/users?exists=1&email=<email>` for existence-only checks.
-
-### Upsert user profile
+### Upsert profile
 `POST /api/users`
 
-Body:
-```json
-{
-  "uid": "firebase-uid",
-  "name": "string",
-  "email": "string|null",
-  "phone": "+911234567890|null",
-  "provider": "password|google|phone",
-  "photo": "string|null",
-  "createdAt": "2026-03-25T10:00:00.000Z"
-}
-```
-
-Response:
-```json
-{ "success": true }
-```
-
-### Fetch a user profile (no password is stored/returned)
-`GET /api/users?email=<email>` or `GET /api/users?uid=<firebase-uid>`
-
-Optional:
-- `phone=+E164` — if DB phone is missing, the API validates and writes it (then returns updated profile).
-
-Response:
-```json
-{ "exists": true, "data": { "uid": "...", "email": "...", "phone": "+91..." } }
-```
-
-### OPTIONS (method discovery / preflight)
-`OPTIONS /api/users`
-
-Response:
-- Status: `204`
-- Headers include:
-  - `Allow: GET,POST,OPTIONS`
-  - `Access-Control-Allow-Methods: GET,POST,OPTIONS`
-  - `Access-Control-Allow-Headers: Content-Type, Authorization`
-
-## Recent Changes
-
-See `docs/CHANGELOG.md` for a concise record of endpoint behavior changes (recommended for Android integration).
+### Fetch profile
+`GET /api/users?uid=<firebase-uid>` or `GET /api/users?email=<email>`
 
 ## Doctors
 
@@ -98,20 +53,74 @@ See `docs/CHANGELOG.md` for a concise record of endpoint behavior changes (recom
 
 Response:
 ```json
-{ "data": [ { "_id": "...", "name": "...", "specialty": "..." } ] }
+{
+  "data": [
+    {
+      "_id": "...",
+      "name": "Dr. Example",
+      "specialty": "Cardiology",
+      "fields": ["Cardiology", "General Medicine"],
+      "hospitals": ["SWACS Hospital", "MetroCare Hospital"]
+    }
+  ],
+  "meta": {
+    "hospitals": [
+      "SWACS Hospital",
+      "MetroCare Hospital",
+      "City General Hospital",
+      "Lifeline Multispecialty Hospital",
+      "Sunrise Medical Center"
+    ]
+  }
+}
 ```
+
+Notes:
+- Hospital names are selector-based and normalized server-side.
+- `SWACS Hospital` is included in the canonical hospital list.
+
+### Admin doctor CRUD
+- `POST /api/doctors`
+- `PATCH /api/doctors`
+- `DELETE /api/doctors?id=<doctorId>`
+- `POST /api/doctors/bootstrap` (admin-only sample data bootstrap)
+
+Create/update body supports:
+- `name: string`
+- `fields: string[]` (multi-field doctor)
+- `hospitals: string[]` (must match selector list)
+- `experience`, `imageUrl`, `rating`, `patients`
+
+Bootstrap response includes:
+- `inserted`, `updated`, `seeded`, `total`
 
 ## Appointments
 
-### Patient: list appointments (auto-promotes `sent`)
+### Patient list appointments
 `GET /api/appointments?uid=<firebase-uid>`
 
 Behavior:
-- Any appointment with `status="sent"` and `statusExpiresAt <= now` is promoted to `pending_approval`.
-- A notification is generated when it becomes `pending_approval`.
+- Any appointment with `status="sent"` is auto-promoted to `pending_approval` after the grace window.
+- Promotion generates a notification.
 
-### Patient: create appointment request
+### Patient cancel appointment
+`DELETE /api/appointments?uid=<firebase-uid>&id=<appointmentId>`
+
+Marks status as `cancelled` and generates a notification.
+
+### Legacy direct create (non-payment flow)
 `POST /api/appointments`
+
+Body supports:
+- `doctor`, `specialty`, `venue`, `date`, `time`, `reason`
+- Optional payment fields for server/internal usage:
+  - `paymentStatus`, `paymentAmount`, `paymentCurrency`
+  - `paymentOrderId`, `paymentId`, `paymentSignature`, `paymentFailureReason`
+
+## Razorpay Booking Flow (INR 200)
+
+### 1) Create payment order
+`POST /api/appointments/payment/order`
 
 Body:
 ```json
@@ -119,69 +128,70 @@ Body:
   "uid": "firebase-uid",
   "patientEmail": "user@example.com",
   "patientName": "User Name",
-  "doctor": "Dr. X",
-  "specialty": "Dermatologist",
+  "doctor": "Dr. Example",
+  "specialty": "Cardiology",
+  "venue": "SWACS Hospital",
   "date": "YYYY-MM-DD",
   "time": "10:00 AM",
   "reason": "optional"
 }
 ```
 
-Response includes:
-- `status: "sent"`
-- `statusExpiresAt: <Date>`
-
-### Patient: cancel appointment
-`DELETE /api/appointments?uid=<firebase-uid>&id=<appointmentId>`
-
-Marks status `cancelled` and creates a notification.
-
-## Notifications
-
-### List notifications
-`GET /api/notifications?uid=<firebase-uid>`
-
-### Mark notification read
-`POST /api/notifications`
-
-Body:
-```json
-{ "uid": "firebase-uid", "id": "<notificationId>", "action": "mark_read" }
-```
-
-## Health Tracker
-
-Metrics are stored in `healthData` keyed by `userId` (currently the user email).
-
-### Add a health metric point
-`POST /api/health/add`
-
-Body:
-```json
-{
-  "userId": "user@example.com",
-  "date": "YYYY-MM-DD",
-  "heartRate": 72,
-  "bloodPressure": 120,
-  "weight": 68.2,
-  "sugar": 98
-}
-```
-
-Notes:
-- Metrics may be `null`, but at least one metric must be provided.
-
-### Fetch points
-`GET /api/health/add?userId=<email>`
-
 Response:
 ```json
 {
-  "success": true,
-  "data": [
-    { "day": "YYYY-MM-DD", "heartRate": 72, "bloodPressure": 120, "weight": 68.2, "sugar": 98 }
-  ]
+  "data": {
+    "keyId": "rzp_key_xxx",
+    "orderId": "order_xxx",
+    "amountPaise": 20000,
+    "amount": 200,
+    "currency": "INR",
+    "doctor": "Dr. Example",
+    "specialty": "Cardiology",
+    "venue": "SWACS Hospital",
+    "date": "YYYY-MM-DD",
+    "time": "10:00 AM"
+  }
 }
+```
+
+### 2) Verify payment and finalize booking
+`POST /api/appointments/payment/verify`
+
+Success body:
+```json
+{
+  "uid": "firebase-uid",
+  "razorpayOrderId": "order_xxx",
+  "razorpayPaymentId": "pay_xxx",
+  "razorpaySignature": "signature",
+  "outcome": "success"
+}
+```
+
+Cancelled/failed body:
+```json
+{
+  "uid": "firebase-uid",
+  "razorpayOrderId": "order_xxx",
+  "outcome": "cancelled",
+  "failureReason": "Checkout window was closed before payment."
+}
+```
+
+Behavior:
+- `success`: signature verified, appointment created with `status="sent"` and `paymentStatus="paid"`.
+- `failed/cancelled`: appointment stored as `status="cancelled"` with payment failure reason.
+
+## Notifications
+
+### List
+`GET /api/notifications?uid=<firebase-uid>`
+
+### Mark read
+`POST /api/notifications`
+```json
+{ "uid": "firebase-uid", "id": "<notificationId>", "action": "mark_read" }
 ```
 
 ## Admin APIs
@@ -189,53 +199,39 @@ Response:
 All admin endpoints require:
 `Authorization: Bearer <admin-token>`
 
+Bootstrap/security note:
+- If `adminSettings` does not exist yet, first login bootstraps it from env variables:
+  - `ADMIN_DEFAULT_USERNAME` (optional, defaults to `admin`)
+  - `ADMIN_DEFAULT_PASSWORD` (required for first bootstrap)
+  - `ADMIN_TOKEN_SECRET` (recommended; if missing, server uses a stable local fallback)
+
 ### Admin login
 `POST /api/admin/login`
 
-Body:
-```json
-{ "username": "admin", "password": "Admin@123" }
-```
-
-Response:
-```json
-{ "token": "....", "expiresInSeconds": 3600 }
-```
-
-### Admin: change username/password
+### Admin settings
 `PATCH /api/admin/settings`
 
-Body:
-```json
-{
-  "currentPassword": "Admin@123",
-  "newUsername": "optional",
-  "newPassword": "optional"
-}
-```
-
-### Admin: manage doctors (CRUD)
-- `POST /api/doctors`
-- `PATCH /api/doctors`
-- `DELETE /api/doctors?id=<doctorId>`
-
-### Admin: patients
+### Admin patients
 - `GET /api/admin/patients?q=<search>`
-- `PATCH /api/admin/patients` (target by `targetEmail` preferred)
+- `PATCH /api/admin/patients`
 
-### Admin: appointments
+### Admin appointments
 - `GET /api/admin/appointments?doctor=<name>&status=<status>&dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD`
-- `PATCH /api/admin/appointments` (approve/reject)
+- `PATCH /api/admin/appointments`
 
-### Admin: message board
-`POST /api/admin/messages`
-
-Body:
+Patch body:
 ```json
 {
-  "title": "string",
-  "message": "string",
-  "sendToAll": false,
-  "emails": ["patient@example.com"]
+  "id": "appointmentId",
+  "status": "approved",
+  "venue": "SWACS Hospital"
 }
 ```
+
+Notes:
+- `status` and `venue` can be updated together.
+- Admin can update only venue (without changing status).
+- Venue is validated against selected doctor's hospital list.
+
+### Admin message board
+`POST /api/admin/messages`

@@ -7,6 +7,8 @@ export default function DoctorDetailsModal({ doctor, onClose }: any) {
 
     const router = useRouter();
     if (!doctor) return null;
+    const fields = Array.isArray(doctor.fields) && doctor.fields.length ? doctor.fields : [doctor.specialty].filter(Boolean);
+    const hospitals = Array.isArray(doctor.hospitals) && doctor.hospitals.length ? doctor.hospitals : ["SWACS Hospital"];
 
     return (
         <AnimatePresence>
@@ -32,17 +34,22 @@ export default function DoctorDetailsModal({ doctor, onClose }: any) {
                         <X className="w-5 h-5" />
                     </button>
 
-                    <div className="w-32 h-32 mx-auto rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-6xl">
-                        {doctor.image}
+                    <div className="w-32 h-32 mx-auto rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-2xl font-semibold">
+                        {doctor.imageUrl ? (
+                            <img src={doctor.imageUrl} alt={doctor.name} className="h-full w-full object-cover" />
+                        ) : (doctor.image || "Dr")}
                     </div>
 
                     <h2 className="text-2xl font-bold text-center mt-4">{doctor.name}</h2>
-                    <p className="text-center text-gray-500 mt-1">{doctor.specialty}</p>
+                    <p className="text-center text-gray-500 mt-1">{fields.join(", ")}</p>
+                    <p className="text-center text-gray-500 mt-1 text-sm">
+                        Venues: {hospitals.join(", ")}
+                    </p>
 
                     <div className="flex items-center justify-center gap-2 mt-3">
                         <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                        <span className="font-semibold">{doctor.rating}</span>
-                        <span className="text-gray-400">({doctor.patients}+ patients)</span>
+                        <span className="font-semibold">{doctor.rating ?? "--"}</span>
+                        <span className="text-gray-400">({doctor.patients ?? "--"}+ patients)</span>
                     </div>
 
                     <button

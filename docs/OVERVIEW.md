@@ -1,55 +1,68 @@
-# MediCare (Pixel Cup) — App Overview
+# MediCare (Pixel Cup) - App Overview
 
-This repo contains a **centralized health tracking + appointments** app built with **Next.js App Router**. It is intended to be used by:
-- Web users (PC/mobile web)
-- An Android app calling the **same HTTP APIs** exposed by this Next.js server
+This repo contains a centralized health tracking + appointment app built with Next.js App Router. It is used by:
+- Web users (desktop/mobile web)
+- Android clients that call the same HTTP APIs
 
 ## Core Features
 
-- **Auth (Firebase)**: Email/password signup + login, Google login, phone OTP login, and phone-number enforcement for Google signups without a phone.
-- **Appointments**: Patient sends appointment requests; status transitions from `sent` → `pending_approval` after ~5 seconds, then admin can approve/reject.
-- **Health tracker**: Patient stores daily metrics (heart rate, systolic BP, weight, sugar) and sees an aligned 7-day chart with placeholder padding.
-- **Notifications**: Patient receives notifications for appointment events + admin messages (message board).
-- **Admin dashboard (hidden)**: Manage doctors, patients, appointment approvals, send targeted messages, change admin credentials.
+- Auth (Firebase): Email/password login, Google login, phone OTP login.
+- Doctors catalog: Admin-managed doctors with multiple medical fields and multiple hospital venues.
+- Appointments: User booking flow with Razorpay payment (INR 200) before appointment creation.
+- Appointment lifecycle: `sent` -> `pending_approval` -> `approved/rejected` (or `cancelled`).
+- Venue-aware confirmations: Admin can confirm appointment and change venue if required.
+- Notifications: Appointment lifecycle events + admin message board notifications.
+- Health tracker: Daily metrics (heart rate, BP, weight, sugar) with charting.
 
 ## Frontend Routes (App Router)
 
-- `/` — Home (shows latest notifications for logged-in users)
-- `/appointments` — Appointment request + history + notifications
-- `/doctors` — Doctors list (DB-backed, with fallback list)
-- `/health-tracker` — Health trends + input form
-- `/emergency` — Emergency page
-- `/admin` — Hidden admin dashboard (requires admin login)
+- `/` - Home
+- `/appointments` - Razorpay-backed booking, status, and notifications
+- `/doctors` - Doctor directory with fields and hospital venues
+- `/health-tracker` - Health trends + input form
+- `/emergency` - Emergency page
+- `/admin` - Hidden admin dashboard
 
 ## Data Storage (MongoDB)
 
 DB name: `medicare`
 
 Collections:
-- `users` — user profile records (upserted from client after auth)
-- `appointments` — appointment requests + status
-- `notifications` — patient notifications + admin messages
-- `doctors` — doctor list managed by admin
-- `healthData` — daily health metrics
-- `adminSettings` — singleton admin credentials (hashed)
+- `users` - user profile records
+- `doctors` - doctors with fields and hospitals
+- `appointments` - appointment requests, statuses, venue, payment metadata
+- `paymentIntents` - Razorpay order intents for booking flow
+- `notifications` - patient notifications + admin messages
+- `healthData` - daily health metrics
+- `adminSettings` - singleton admin credentials (hashed)
 
 ## Environment Variables
 
-- `MONGODB_URI` (required) — MongoDB connection string
-- Firebase public config (required for auth in web):
-  - `NEXT_PUBLIC_FIREBASE_API_KEY`
-  - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-  - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-  - `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-  - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-  - `NEXT_PUBLIC_FIREBASE_APP_ID`
-- `ADMIN_TOKEN_SECRET` (optional) — secret for signing admin tokens. If not set, the app falls back to `MONGODB_URI` or `"dev-secret"`.
+Required:
+- `MONGODB_URI`
+- `ADMIN_DEFAULT_PASSWORD`
+- `RAZORPAY_KEY_ID`
+- `RAZORPAY_KEY_SECRET`
 
-## Important Security Note (Android integration)
+Firebase public config (required for web auth):
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
 
-Most patient APIs currently identify a user via query/body fields like `uid` or `userId` (email) **without server-side verification of Firebase ID tokens**.
+Optional:
+- `ADMIN_TOKEN_SECRET` (recommended; if missing, server uses a stable local fallback)
+- `ADMIN_DEFAULT_USERNAME` (defaults to `admin`)
+- `RAZORPAY_ORDER_URL` (defaults to `https://api.razorpay.com/v1/orders`)
+- `NEXT_PUBLIC_RAZORPAY_CHECKOUT_URL` (defaults to `https://checkout.razorpay.com/v1/checkout.js`)
+- `NEXT_PUBLIC_RAZORPAY_PAYMENT_BUTTON_ID` (only needed for hosted Razorpay payment-button embeds)
 
-For production, you should:
+## Security Note
+
+Most patient APIs still identify users via body/query `uid` without server-side Firebase ID token verification.
+
+For production:
 - Send Firebase ID tokens from Android/web (`Authorization: Bearer <firebase-id-token>`)
-- Verify tokens in API routes (admin routes are already token protected, patient routes are not)
-
+- Verify tokens in patient API routes

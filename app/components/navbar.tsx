@@ -38,6 +38,7 @@ const navItems = [
 const protectedRoutes = [
   "/health-tracker",
 ];
+const ADMIN_TOKEN_KEY = "medicare_admin_token";
 
 const Navbar: React.FC<NavbarProps> = ({
   isDark,
@@ -54,9 +55,28 @@ const Navbar: React.FC<NavbarProps> = ({
 
   const [authOpen, setAuthOpen] = React.useState(false);
   const [profileOpen, setProfileOpen] = React.useState(false);
+  const [hasAdminSession, setHasAdminSession] = React.useState(false);
+  const isAdminRoute = pathname?.startsWith("/admin");
+
+  React.useEffect(() => {
+    const syncAdminSession = () => {
+      if (typeof window === "undefined") return;
+      setHasAdminSession(Boolean(localStorage.getItem(ADMIN_TOKEN_KEY)));
+    };
+
+    syncAdminSession();
+    window.addEventListener("storage", syncAdminSession);
+    window.addEventListener("focus", syncAdminSession);
+    window.addEventListener("admin-auth-changed", syncAdminSession);
+    return () => {
+      window.removeEventListener("storage", syncAdminSession);
+      window.removeEventListener("focus", syncAdminSession);
+      window.removeEventListener("admin-auth-changed", syncAdminSession);
+    };
+  }, []);
 
   const displayName =
-    user?.displayName || user?.email?.split("@")[0] || "User";
+    user?.displayName || user?.email?.split("@")?.[0] || "User";
 
   const handleProtectedNav = (
     e: React.MouseEvent,
@@ -141,7 +161,7 @@ const Navbar: React.FC<NavbarProps> = ({
               {/* AUTH */}
               {!loading && (
                 <>
-                  {!user ? (
+                  {!user && !(isAdminRoute && hasAdminSession) ? (
                     <button
                       onClick={() => setAuthOpen(true)}
                       className="px-6 py-2 rounded-lg bg-gradient-to-r
@@ -168,7 +188,7 @@ const Navbar: React.FC<NavbarProps> = ({
                           <div className="px-4 py-3 border-b">
                             <p className="font-semibold">{displayName}</p>
                             <p className="text-sm text-gray-500">
-                              {user.email}
+                              {user?.email || "No email"}
                             </p>
                           </div>
 

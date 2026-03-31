@@ -2,9 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getMongoDb } from "@/app/lib/mongo";
 import { getAdminAuth } from "@/app/lib/adminAuth";
+import {
+  HOSPITAL_OPTIONS,
+  isIsoDate,
+  normalizeHospitals,
+  normalizeHospital,
+} from "@/app/lib/appointmentConfig";
 
 const asString = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-const isIsoDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+const normalizeDoctorName = (value: unknown) =>
+  (typeof value === "string" ? value.trim().toLowerCase() : "");
 
 type AppointmentStatus =
   | "sent"
@@ -20,6 +27,13 @@ const allowedStatus = new Set<AppointmentStatus>([
   "rejected",
   "cancelled",
 ]);
+
+const getAppointmentMessage = (data: {
+  doctor: string;
+  date: string;
+  time: string;
+  venue?: string | null;
+}) => `${data.doctor} | ${data.date} | ${data.time} | Venue: ${data.venue || "TBD"}`;
 
 export async function GET(req: NextRequest) {
   const auth = getAdminAuth(req);
@@ -52,7 +66,8 @@ export async function GET(req: NextRequest) {
 
   const list = await appointments
     .find(filter)
-    .sort({ date: 1, doctor: 1, time: 1, createdAt: -1 })
+    // True FCFS ordering for admin queue: oldest request first.
+    .sort({ createdAt: 1, _id: 1 })
     .limit(200)
     .toArray();
 
@@ -93,10 +108,16 @@ export async function PATCH(req: NextRequest) {
   }
 
   const id = asString((body as any).id);
-  const status = asString((body as any).status) as AppointmentStatus;
+  const statusInput = asString((body as any).status);
+  const venueInput = normalizeHospital((body as any).venue);
+  const hasStatusUpdate = Boolean(statusInput);
+  const hasVenueUpdate = Boolean((body as any).venue);
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-  if (!allowedStatus.has(status)) {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  if (!hasStatusUpdate && !hasVenueUpdate) {
+    return NextResponse.json(
+      { error: "At least one of status or venue is required" },
+      { status: 400 }
+    );
   }
 
   let objectId: ObjectId;
@@ -109,28 +130,95 @@ export async function PATCH(req: NextRequest) {
   const db = await getMongoDb();
   const appointments = db.collection("appointments");
   const notifications = db.collection("notifications");
+  const doctors = db.collection("doctors");
 
   const appt = await appointments.findOne({ _id: objectId });
   if (!appt) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const now = new Date();
-  await appointments.updateOne(
-    { _id: objectId },
-    { $set: { status, updatedAt: now } }
-  );
+  const update: any = { updatedAt: new Date() };
+  const now = update.updatedAt as Date;
 
-  if (appt.uid) {
+  if (hasStatusUpdate) {
+    const status = statusInput as AppointmentStatus;
+    if (!allowedStatus.has(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+    update.status = status;
+  }
+
+  if (hasVenueUpdate) {
+    if (!venueInput) {
+      return NextResponse.json({ error: "Invalid venue selected" }, { status: 400 });
+    }
+
+    const doctorName = asString((appt as any).doctor);
+    const normalizedDoctorName = normalizeDoctorName(doctorName);
+
+    let doctorDoc = doctorName ? await doctors.findOne({ name: doctorName }) : null;
+    if (!doctorDoc && normalizedDoctorName) {
+      doctorDoc = await doctors.findOne({
+        $expr: {
+          $eq: [{ $toLower: { $trim: { input: "$name" } } }, normalizedDoctorName],
+        },
+      });
+    }
+
+    if (doctorDoc) {
+      const doctorHospitals = normalizeHospitals((doctorDoc as any).hospitals);
+      if (!doctorHospitals.includes(venueInput)) {
+        return NextResponse.json(
+          { error: "Selected venue is not available for this doctor" },
+          { status: 400 }
+        );
+      }
+    } else if (!Array.from(HOSPITAL_OPTIONS).includes(venueInput)) {
+      return NextResponse.json(
+        { error: "Selected venue is invalid" },
+        { status: 400 }
+      );
+    }
+
+    if (!doctorDoc) {
+      console.warn(
+        `[admin.appointments] doctor lookup failed for appointment=${id}; allowing venue update using global hospital options`
+      );
+    }
+
+    update.venue = venueInput;
+  }
+
+  await appointments.updateOne({ _id: objectId }, { $set: update });
+
+  const updated = await appointments.findOne({ _id: objectId });
+  if (updated?.uid) {
+    const nextStatus = (update.status || appt.status || "pending_approval") as string;
+    const venueForMessage = update.venue || updated.venue || appt.venue || null;
     const title =
-      status === "approved"
-        ? "Appointment approved"
-        : status === "rejected"
+      update.status === "approved"
+        ? "Appointment confirmed"
+        : update.status === "rejected"
           ? "Appointment rejected"
-          : "Appointment updated";
-    const message = `Your appointment (${appt.doctor} • ${appt.date} • ${appt.time}) is now: ${status.replace(/_/g, " ")}.`;
+          : hasVenueUpdate && !hasStatusUpdate
+            ? "Appointment venue updated"
+            : "Appointment updated";
+    const message =
+      update.status === "approved"
+        ? `Your appointment is confirmed (${getAppointmentMessage({
+            doctor: appt.doctor,
+            date: appt.date,
+            time: appt.time,
+            venue: venueForMessage,
+          })}).`
+        : `Your appointment update: ${nextStatus.replace(/_/g, " ")} (${getAppointmentMessage({
+            doctor: appt.doctor,
+            date: appt.date,
+            time: appt.time,
+            venue: venueForMessage,
+          })}).`;
 
     await notifications.insertOne({
-      uid: appt.uid,
-      type: `appointment.${status}`,
+      uid: updated.uid,
+      type: `appointment.${update.status || "updated"}`,
       title,
       message,
       createdAt: now,
@@ -139,6 +227,9 @@ export async function PATCH(req: NextRequest) {
     });
   }
 
-  const updated = await appointments.findOne({ _id: objectId });
+  console.info(
+    `[admin.appointments] updated id=${id} status=${update.status || appt.status} venue=${update.venue || appt.venue || "TBD"}`
+  );
+
   return NextResponse.json({ data: updated });
 }
